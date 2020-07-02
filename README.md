@@ -1,0 +1,2 @@
+# Cloud-Computing
+The work completed in the third year Computer Science module, Cloud Computing. The task of the assignment was to develop a cloud service solution using PaaS and IaaS for a mock Company. An infrastructure diagram was produced in the planning phase and code files implementing the solution were written in YAML and Jinja. Furthermore, revision of documentation produced throughout the module lead to an exam result of 80%. A 1st class was achieved overall in this module.
