@@ -1,0 +1,132 @@
+#CMP3747M - Cloud Computing
+#By Gabriella Di Gregorio 1564188
+
+imports:
+- path: network-template.jinja
+- path: subnetwork-template.jinja
+- path: vm-template.jinja
+- path: sql-instance-template.jinja
+- path: bucket-template.jinja
+- path: vpn-template.jinja
+
+#A Virtual Private Cloud (VPC) network is a virtual version of a physical network, such as a data center network.
+#It provides connectivity for Virtual Machines (VMs) and other project resources.
+#VPC networks, including their associated routes and firewall rules, are global resources. They are not associated with any particular region or zone. (cloud.google.com, 2019)
+#The company has been provided with one network since they are a small-medium enterprise (SME) and will be operating at a multi-regional level rather than international.
+resources:
+- name: the-network
+  type: network-template.jinja
+
+  #A subnetwork (also known as a subnet) is a logical partition of a Virtual Private Cloud network with one primary IP range and zero or more secondary IP ranges.
+  #Subnets are regional resources. Each subnet defines a range of IP addresses. (cloud.google.com, 2019)
+  #The company's network has been split into two subnets.
+  #The first subnet is located in europe-west2 which is located in London, since the company is based in the UK and will mostly operate at a regional level.
+- name: subnet-europe-west2
+  type: subnetwork-template.jinja
+  properties:
+    ipCidrRange: 192.168.0.0/28
+    network: $(ref.the-network.selfLink)
+    region: europe-west2
+
+#The second subnet is located in europe-west1 which is located in Belgium. This was chosen to allow for growth on a multi-regional level, to provide redundancy,
+#and because this region also supports a wide range of products.
+#Ideally in the future, a regional load balancer could be implemented to provide additional redudancy. Traffic would then be redirected based on demand to avoid one being overworked.
+- name: subnet-europe-west1
+  type: subnetwork-template.jinja
+  properties:
+    ipCidrRange: 192.168.0.16/28
+    network: $(ref.the-network.selfLink)
+    region: europe-west1
+
+#For security purposes, a vpn has been created on the network.
+#Cloud VPN securely connects the peer network to the Google Cloud Platform (GCP) Virtual Private Cloud (VPC) network through an IPsecVPNconnection.
+#Traffic traveling between the two networks is encrypted by one VPN gateway, then decrypted by the other VPN gateway. (cloud.google.com, 2019)
+#The VPN is based in europe-west2 since this is where the majority of operations will take place and the most traffic will be.
+- name: vpn-europe-west2
+  type: vpn-template.jinja
+  properties:
+    region: europe-west2
+    peerIp: 185.35.50.4
+    sourceRanges: 192.168.0.0/24
+    vpnTag: webserver-tag
+
+#Virtual Machines (VMs) are Compute Engine Instances that provide the company with computing power.
+#Two VMs are connected to the subnet located in europe-west2, and to provide further redundancy, they are in seperate zones; europe-west2-a and b.
+#Since the majoirty of operations will take place in the UK, it is important to have plenty of computing power. So, the two VMs in the London region are 'small' machine types rather than micro.
+- name: vm-europe-west2-1
+  type: vm-template.jinja
+  properties:
+    zone: europe-west2-a
+    machineType: https://www.googleapis.com/compute/v1/projects/cmp3747m-digregorio-15624188/zones/europe-west2-a/machineTypes/g1-small
+    network: $(ref.the-network.selfLink)
+    subnet: $(ref.subnet-europe-west2.selfLink)
+
+- name: vm-europe-west2-2
+  type: vm-template.jinja
+  properties:
+    zone: europe-west2-b
+    machineType: https://www.googleapis.com/compute/v1/projects/cmp3747m-digregorio-15624188/zones/europe-west2-b/machineTypes/g1-small
+    network: $(ref.the-network.selfLink)
+    subnet: $(ref.subnet-europe-west2.selfLink)
+
+#Two VMs are also connected to the subnet in europe-west1, and these are also in seperate regions; europe-west1-b and europe-west1-c
+#However, since the company is based in the UK there will be less demand for resources elsewhere in europe so these VMs are 'micro' machine types.
+- name: vm-europe-west1-1
+  type: vm-template.jinja
+  properties:
+    zone: europe-west1-b
+    machineType: https://www.googleapis.com/compute/v1/projects/cmp3747m-digregorio-15624188/zones/europe-west1-b/machineTypes/f1-micro
+    network: $(ref.the-network.selfLink)
+    subnet: $(ref.subnet-europe-west1.selfLink)
+
+- name: vm-europe-west1-2
+  type: vm-template.jinja
+  properties:
+    zone: europe-west1-c
+    machineType: https://www.googleapis.com/compute/v1/projects/cmp3747m-digregorio-15624188/zones/europe-west1-c/machineTypes/f1-micro
+    network: $(ref.the-network.selfLink)
+    subnet: $(ref.subnet-europe-west1.selfLink)
+
+#Since the company will be collecting data from devices and IoT-enabled items, they require data storage
+#Cloud SQL is a fully-managed database service that makes it easy to set up, maintain, manage, and administer your relational PostgreSQL and MySQL databases in the cloud. 
+#It offers high performance, scalability, and convenience. Hosted on Google Cloud Platform, Cloud SQL provides a database infrastructure for applications running anywhere. (Qwiklabs.com, 2019)
+#An SQL instance is created in each region, europe-west2 and europe-west1
+#The Cloud SQL Admin API is required for this to run.
+#A unique name is required for this to run, once it has deployed and deleted once, rename before deploying again.
+- name: sql1-europe-west2-15624188
+  type: sql-instance-template.jinja
+  properties:
+   region: europe-west2
+
+- name: sql2-europe-west1-15624188
+  type: sql-instance-template.jinja
+  properties:
+   region: europe-west1
+
+#Buckets are the basic containers that hold data - everything that stored in Cloud Storage must be contained in a bucket. 
+#Buckets can be used to organize data and control access to it, but unlike directories and folders, they cannot be nested. (cloud.google.com, 2019)
+#Bucket storage is based on region, one has been created for both europe-west2 and europe-west1
+#A unique name is required for this to run, once it has deployed and deleted once, rename before deploying again.
+- name: storage-bucket1-europe-west2-15624188
+  type: bucket-template.jinja
+  properties:
+    region: europe-west2
+    storageClass: REGIONAL
+
+- name: storage-bucket2-europe-west1-15624188
+  type: bucket-template.jinja
+  properties:
+    region: europe-west1
+    storageClass: REGIONAL
+
+#References:
+    #Qwiklabs. (2019). Create a Cloud SQL Instance Using Deployment Manager. [online] Available at: https://www.qwiklabs.com/focuses/647?parent=catalog [Accessed 4 Dec. 2019].
+    
+    #digi.com. (2005). Digi Connect® WAN Application Helper | NAT, GRE, ESP and TCP/UPD Forwarding and IP Filtering. [online] 
+    #Available at: http://ftp1.digi.com/support/documentation/connectwan_natforwardingfiltering.pdf [Accessed 4 Dec. 2019].
+
+    #Google Cloud. (2019). Google Cloud Platform  |  Documentation. [online] Available at: https://cloud.google.com/docs/ [Accessed 4 Dec. 2019].
+
+    #Ietf.org. (1998). IP Encapsulating Security Payload (ESP). [online] Available at: https://www.ietf.org/rfc/rfc2406.txt [Accessed 4 Dec. 2019].
+
+    #Ietf.org. (1980). User Datagram Protocol. [online] Available at: https://www.ietf.org/rfc/rfc768.txt [Accessed 4 Dec. 2019].

@@ -1,0 +1,81 @@
+#Template to configure all necessary parts of a VPN
+
+resources:
+#Gets a static IP for the VPN for a given region
+- name: vpn-ip
+  type: compute.v1.address
+  properties:
+    region: {{ properties['region'] }}
+
+#Creates a VPN gateway on the network for a given region
+- name: vpn-gateway
+  type: compute.v1.targetVpnGateway
+  properties:
+    region: {{ properties['region'] }}
+    network: $(ref.the-network.selfLink)
+
+#Creates three port forwarding rules needed for the VPN to function, for a given region
+#These forward traffic from the static IP to the VPN gateway, which were created above
+#ESP: Specifies the IP Encapsulating Security Payload protocol. (cloud.google.com, 2019)
+#ESP is used to provide confidentiality, data origin authentication, connectionless integrity, an anti-replay service (a form of partial sequence integrity), and limited traffic flow confidentiality. (Ietf.org, 1998)
+#IPsec ESP tunnel-mode traffic can be forwarded to a router or VPN appliance. UDP Port 500 may also be needed to forward IKE/ISAKMP traffic. (digi.com, 2005)
+- name: forward-esp
+  type: compute.v1.forwardingRules
+  properties:
+    region: {{ properties['region'] }}
+    IPAddress: $(ref.vpn-ip.address)
+    IPProtocol: ESP
+    target: $(ref.vpn-gateway.selfLink)
+#UDP: Specifies the User Datagram Protocol. (cloud.google.com, 2019)
+#This protocol provides a procedure for application programs to send messages to other programs with a minimum  of protocol mechanism. (Ietf.org, 1980)
+- name: forward-udp500
+  type: compute.v1.forwardingRules
+  properties:
+    region: {{ properties['region'] }}
+    IPAddress: $(ref.vpn-ip.address)
+    IPProtocol: UDP
+    portRange: 500
+    target: $(ref.vpn-gateway.selfLink)
+- name: forward-udp4500
+  type: compute.v1.forwardingRules
+  properties:
+    region: {{ properties['region'] }}
+    IPAddress: $(ref.vpn-ip.address)
+    IPProtocol: UDP
+    portRange: 4500
+    target: $(ref.vpn-gateway.selfLink)
+
+#Creates a VPN tunnel to connect to the business' local network with a secure pre-shared secret, given a region and a peer Ip address.
+#Uses the created VPN gateway as the target and te udp4500 forwarding rule created above.
+- name: vpn-tunnel
+  type: compute.v1.vpnTunnel
+  properties:
+    region: {{ properties['region'] }}
+    targetVpnGateway: $(ref.vpn-gateway.selfLink)
+    forwardingRule: $(ref.forward-udp4500.selfLink)
+    peerIp: {{ properties['peerIp'] }}
+    sharedSecret: G5Q35hgWC7dtuv1H8m7cabCJzUtNsgLI
+    localTrafficSelector: [0.0.0.0/0]
+    
+#Adds a firewall rule to the network to ensure traffic can pass through the network.
+#This is not regional but defined source ranges are required.
+- name: vpn-rule
+  type: compute.v1.firewall
+  properties:
+    network: $(ref.the-network.selfLink)
+    sourceRanges: [{{ properties['sourceRanges'] }}]
+    allowed:
+      - IPProtocol: tcp
+      - IPProtocol: udp
+      - IPProtocol: icmp
+
+#Adds a static route on the network to direct traffic outgoing through the VPN
+#Uses the VPN tunnel previously created as the next hop.
+- type: compute.v1.route
+  name: vpn-route
+  properties:
+    network: $(ref.the-network.selfLink)
+    nextHopVpnTunnel: $(ref.vpn-tunnel.selfLink)
+    destRange: 0.0.0.0/0
+    tags:
+      - {{ properties['vpnTag'] }}

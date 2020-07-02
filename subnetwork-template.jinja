@@ -1,0 +1,9 @@
+#Template to create a subnetwork on a given network in a given region with a given name and ipCidrRange.
+
+resources:
+- name: {{ env["name"] }}
+  type: compute.v1.subnetwork
+  properties:
+    ipCidrRange: {{ properties["ipCidrRange"] }}
+    network: {{ properties["network"] }}
+    region: {{ properties["region"] }}

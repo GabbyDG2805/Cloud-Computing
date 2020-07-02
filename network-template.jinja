@@ -1,0 +1,7 @@
+#Creates a vpc network with a given name and does not automatically create subnets.
+
+resources:
+- name: {{ env["name"] }}
+  type: compute.v1.network
+  properties:
+    autoCreateSubnetworks: false

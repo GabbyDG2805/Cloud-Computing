@@ -1,0 +1,24 @@
+#Template to create a Virtual Machine (VM)
+#Some properties stay consistent across all VMs such as thhe disk, source image, and network access configs.
+#Other properties need to be defined such as its name, the zone it is located in, the machine type, and the network and subnet it is connected to.
+#Debian was chosen as the source image to allow for more flexibilty. Since the company is an SME, an enterprise server is unneccesary
+
+resources:
+- name: {{ env["name"] }}
+  type: compute.v1.instance
+  properties:
+    zone: {{ properties["zone"] }}
+    machineType: {{ properties["machineType"] }}
+    disks:
+    - deviceName: boot
+      type: PERSISTENT
+      boot: true
+      autoDelete: true
+      initializeParams:
+        sourceImage: https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/debian-9-stretch-v20191121
+    networkInterfaces:
+    - network: {{ properties["network"] }}
+      subnetwork: {{ properties["subnet"] }}
+      accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
